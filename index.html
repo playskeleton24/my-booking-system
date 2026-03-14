@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預約服務 - 專業時段選擇</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        
+        .time-slot {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .time-slot.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        }
+
+        .time-slot.disabled {
+            background-color: #f1f5f9;
+            color: #cbd5e1;
+            border-color: #e2e8f0;
+            cursor: not-allowed;
+            pointer-events: none;
+            text-decoration: line-through;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #4f46e5;
+            color: #4f46e5;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 relative">
+
+    <div class="h-2 bg-indigo-600"></div>
+
+    <!-- Tab 導航 -->
+    <nav class="max-w-2xl mx-auto flex border-b border-slate-200 mt-4 px-4 bg-white/50 backdrop-blur rounded-t-xl">
+        <button id="tab-client-btn" class="flex-1 py-4 font-bold tab-active">客戶預約</button>
+        <button id="tab-admin-btn" class="flex-1 py-4 font-bold text-slate-400">管理者後台</button>
+    </nav>
+
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        
+        <!-- 客戶預約區塊 -->
+        <section id="client-view" class="block space-y-6">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">預約諮詢服務</h1>
+                <p class="text-slate-500">選擇您方便的時間，我們將為您保留時段。</p>
+            </header>
+
+            <!-- 預約表單 -->
+            <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+                <div class="p-8 border-b border-slate-50">
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">步驟 1. 選擇日期</label>
+                    <input type="date" id="bookingDate" class="w-full text-lg font-medium p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
+                </div>
+
+                <div class="p-8">
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">步驟 2. 選擇時段</label>
+                    <div id="slotsContainer" class="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="col-span-2 py-8 text-center text-slate-400 italic">載入時段中...</div>
+                    </div>
+                </div>
+
+                <div id="confirmForm" class="hidden p-8 bg-slate-50 border-t border-slate-100 space-y-4">
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">步驟 3. 填寫聯繫資訊</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="userName" placeholder="您的姓名" class="p-3 rounded-xl border-slate-200 focus:ring-indigo-500 border outline-none">
+                        <input type="tel" id="userPhone" placeholder="聯絡電話" class="p-3 rounded-xl border-slate-200 focus:ring-indigo-500 border outline-none">
+                    </div>
+                    <button id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                        <span id="btnText">立即預約</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 客戶端的「我的預約」區塊 -->
+            <div id="my-bookings-container" class="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 hidden">
+                <h3 class="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-4">我的當日預約</h3>
+                <div id="myBookingsList" class="space-y-3">
+                    <!-- 我的預約項目會出現在這裡 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 管理者後台區塊 -->
+        <section id="admin-view" class="hidden">
+            <header class="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">管理者後台</h2>
+                    <p class="text-slate-500 text-sm">管理已預訂時段，取消將釋放名額</p>
+                </div>
+                <div class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">即時連線</div>
+            </header>
+
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-6">
+                <div class="flex items-center justify-between mb-6 border-b pb-4">
+                    <span class="font-bold text-slate-700">所有預約紀錄</span>
+                    <span id="totalBookings" class="text-sm bg-slate-100 px-2 py-1 rounded text-slate-500">0 筆資料</span>
+                </div>
+                
+                <div id="adminListContainer" class="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="text-center py-12 text-slate-400 italic">目前尚無預約資料</div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 成功通知 (彈窗) -->
+    <div id="successModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✓</div>
+            <h3 class="text-xl font-bold mb-2">預約成功！</h3>
+            <p id="successMsg" class="text-slate-500 mb-6"></p>
+            <button id="closeModalBtn" class="w-full bg-slate-900 text-white py-3 rounded-xl font-medium">太棒了</button>
+        </div>
+    </div>
+
+    <!-- 自訂 Alert 提示彈窗 (取代原生的 alert) -->
+    <div id="customAlertModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <h3 class="text-xl font-bold mb-2 text-slate-900">系統提示</h3>
+            <p id="customAlertMsg" class="text-slate-500 mb-6"></p>
+            <button id="closeAlertBtn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium">了解</button>
+        </div>
+    </div>
+
+    <!-- 自訂 Confirm 確認彈窗 (取代原生的 confirm) -->
+    <div id="customConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">!</div>
+            <h3 class="text-xl font-bold mb-2 text-slate-900">確認取消</h3>
+            <p id="customConfirmMsg" class="text-slate-500 mb-6 text-sm">確定要取消嗎？此操作無法還原。</p>
+            <div class="flex gap-3">
+                <button id="cancelConfirmBtn" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-medium hover:bg-slate-200">返回</button>
+                <button id="okConfirmBtn" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium hover:bg-red-600 shadow-lg shadow-red-200">確定取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'booking-app-v3';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let selectedSlot = null;
+        let bookedSlotsMap = new Map();
+        let allBookingsRaw = [];
+
+        // 輔助函式：取得正確的 Firestore 路徑
+        const getBookingCollection = () => collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
+        const getBookingDocRef = (id) => doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id);
+
+        const datePicker = document.getElementById('bookingDate');
+        datePicker.min = new Date().toISOString().split('T')[0];
+        datePicker.value = datePicker.min;
+
+        // --- 自訂 Alert 與 Confirm 邏輯 ---
+        const showAlert = (msg) => {
+            document.getElementById('customAlertMsg').innerText = msg;
+            document.getElementById('customAlertModal').style.display = 'flex';
+        };
+        
+        document.getElementById('closeAlertBtn').onclick = () => {
+            document.getElementById('customAlertModal').style.display = 'none';
+        };
+
+        const showConfirm = (msg) => {
+            return new Promise((resolve) => {
+                document.getElementById('customConfirmMsg').innerText = msg;
+                document.getElementById('customConfirmModal').style.display = 'flex';
+                
+                document.getElementById('okConfirmBtn').onclick = () => {
+                    document.getElementById('customConfirmModal').style.display = 'none';
+                    resolve(true);
+                };
+                
+                document.getElementById('cancelConfirmBtn').onclick = () => {
+                    document.getElementById('customConfirmModal').style.display = 'none';
+                    resolve(false);
+                };
+            });
+        };
+
+        // --- 取消預約邏輯 ---
+        const handleCancelBooking = async (id, btn) => {
+            if (!currentUser) return;
+            
+            // 使用自訂確認視窗取代原生 confirm()
+            const isConfirmed = await showConfirm("確定要取消此預約嗎？\n取消後該時段將立即恢復為可預約狀態。");
+            if (!isConfirmed) return;
+            
+            btn.disabled = true;
+            const originalText = btn.innerText;
+            btn.innerText = "處理中...";
+
+            try {
+                await deleteDoc(getBookingDocRef(id));
+                // 刪除成功後 onSnapshot 會自動更新畫面
+            } catch (error) {
+                console.error("Cancel Error:", error);
+                showAlert("操作失敗，請稍後再試。");
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        };
+
+        // --- 切換分頁 ---
+        const switchTab = (target) => {
+            const clientView = document.getElementById('client-view');
+            const adminView = document.getElementById('admin-view');
+            const tabClientBtn = document.getElementById('tab-client-btn');
+            const tabAdminBtn = document.getElementById('tab-admin-btn');
+
+            if (target === 'client') {
+                clientView.classList.remove('hidden');
+                adminView.classList.add('hidden');
+                tabClientBtn.classList.add('tab-active');
+                tabClientBtn.classList.remove('text-slate-400');
+                tabAdminBtn.classList.remove('tab-active');
+                tabAdminBtn.classList.add('text-slate-400');
+            } else {
+                clientView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                tabAdminBtn.classList.add('tab-active');
+                tabAdminBtn.classList.remove('text-slate-400');
+                tabClientBtn.classList.remove('tab-active');
+                tabClientBtn.classList.add('text-slate-400');
+            }
+        };
+
+        // --- 初始化與認證 ---
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+
+        onAuthStateChanged(auth, (u) => {
+            currentUser = u;
+            if (currentUser) startSync();
+        });
+
+        initAuth();
+
+        // --- 數據同步 ---
+        function startSync() {
+            onSnapshot(getBookingCollection(), (snapshot) => {
+                bookedSlotsMap.clear();
+                allBookingsRaw = [];
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    allBookingsRaw.push({ id: doc.id, ...data });
+                    bookedSlotsMap.set(`${data.date}_${data.slot}`, data);
+                });
+                
+                renderClientSlots();
+                renderMyBookings();
+                renderAdminList();
+            }, (err) => console.error(err));
+        }
+
+        // --- 渲染客戶時段列表 ---
+        function renderClientSlots() {
+            const container = document.getElementById('slotsContainer');
+            const targetDate = datePicker.value;
+            container.innerHTML = '';
+            
+            const startTime = 9 * 60; 
+            const endTime = 18 * 60;
+            const duration = 60;
+
+            for (let time = startTime; time + duration <= endTime; time += duration) {
+                const h = Math.floor(time / 60).toString().padStart(2, '0');
+                const m = (time % 60).toString().padStart(2, '0');
+                const nextH = Math.floor((time + duration) / 60).toString().padStart(2, '0');
+                const nextM = ((time + duration) % 60).toString().padStart(2, '0');
+                const label = `${h}:${m}–${nextH}:${nextM}`;
+
+                if (h === '12') continue; 
+
+                const isBooked = bookedSlotsMap.has(`${targetDate}_${label}`);
+                const btn = document.createElement('button');
+                btn.className = `time-slot p-4 bg-white border border-slate-200 rounded-2xl text-slate-700 font-medium ${isBooked ? 'disabled' : 'hover:border-indigo-500 hover:text-indigo-600'}`;
+                btn.innerText = isBooked ? `${label} (已預訂)` : label;
+                
+                if (!isBooked) {
+                    btn.onclick = () => {
+                        document.querySelectorAll('.time-slot').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        selectedSlot = label;
+                        document.getElementById('confirmForm').classList.remove('hidden');
+                    };
+                }
+                container.appendChild(btn);
+            }
+        }
+
+        // --- 新增：渲染「我的預約」清單 ---
+        function renderMyBookings() {
+            const container = document.getElementById('myBookingsList');
+            const outerContainer = document.getElementById('my-bookings-container');
+            const targetDate = datePicker.value;
+            
+            // 過濾出屬於當前使用者且日期的預約
+            const myItems = allBookingsRaw.filter(item => 
+                item.userId === currentUser?.uid && item.date === targetDate
+            );
+
+            if (myItems.length === 0) {
+                outerContainer.classList.add('hidden');
+                return;
+            }
+
+            outerContainer.classList.remove('hidden');
+            container.innerHTML = '';
+
+            myItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-indigo-100";
+                div.innerHTML = `
+                    <div>
+                        <span class="text-indigo-600 font-bold">${item.slot}</span>
+                        <span class="text-slate-400 text-xs ml-2">${item.userName}</span>
+                    </div>
+                    <button class="cancel-my-btn text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg transition-colors hover:bg-red-100" data-id="${item.id}">取消</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- 渲染管理者列表 ---
+        function renderAdminList() {
+            const container = document.getElementById('adminListContainer');
+            const totalDisplay = document.getElementById('totalBookings');
+            container.innerHTML = '';
+            
+            const sorted = allBookingsRaw.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            totalDisplay.innerText = `${sorted.length} 筆資料`;
+
+            if (sorted.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-slate-400 italic">目前尚無預約資料</div>`;
+                return;
+            }
+
+            sorted.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-4 border border-slate-100 rounded-2xl bg-slate-50 flex justify-between items-center";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-bold bg-indigo-600 text-white px-2 py-0.5 rounded">${item.date}</span>
+                            <span class="text-sm font-bold text-slate-700">${item.slot}</span>
+                        </div>
+                        <div class="text-sm text-slate-600">${item.userName || '未知'} · ${item.userPhone || '無號碼'}</div>
+                    </div>
+                    <button class="admin-cancel-btn text-xs text-red-500 hover:bg-red-100 px-3 py-2 rounded-lg border border-red-200 transition-colors" data-id="${item.id}">
+                        刪除
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // --- 事件委派：監聽所有的取消按鈕 ---
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.cancel-my-btn') || e.target.closest('.admin-cancel-btn');
+            if (btn) {
+                handleCancelBooking(btn.dataset.id, btn);
+            }
+        });
+
+        // --- 基礎事件綁定 ---
+        document.getElementById('tab-client-btn').onclick = () => switchTab('client');
+        document.getElementById('tab-admin-btn').onclick = () => switchTab('admin');
+        datePicker.onchange = () => {
+            renderClientSlots();
+            renderMyBookings();
+        };
+
+        document.getElementById('submitBtn').onclick = async () => {
+            const name = document.getElementById('userName').value;
+            const phone = document.getElementById('userPhone').value;
+            // 使用自訂彈窗取代 alert
+            if (!selectedSlot || !name || !phone) return showAlert("請填寫完整的姓名與電話資訊。");
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+
+            try {
+                const bookingId = `${datePicker.value}_${selectedSlot.replace(/[^\w]/g, '_')}`;
+                await setDoc(getBookingDocRef(bookingId), {
+                    date: datePicker.value,
+                    slot: selectedSlot,
+                    userName: name,
+                    userPhone: phone,
+                    userId: currentUser.uid,
+                    timestamp: new Date().getTime()
+                });
+                
+                document.getElementById('successMsg').innerText = `${datePicker.value} ${selectedSlot}`;
+                document.getElementById('successModal').style.display = 'flex';
+            } catch (e) {
+                showAlert("預約失敗，請稍後再試。");
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('closeModalBtn').onclick = () => {
+            document.getElementById('successModal').style.display = 'none';
+            document.getElementById('confirmForm').classList.add('hidden');
+            selectedSlot = null;
+        };
+
+    </script>
+</body>
+</html>
